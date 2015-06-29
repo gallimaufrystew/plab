@@ -36,9 +36,18 @@ class DistControl {
   template<typename T> 
   void asend(std::vector<T> *send_vec, int to_rank)
   {
-    int rc = MPI_Isend(send_vec->data(), send_vec->size() * sizeof(T), MPI_BYTE, to_rank, 0, MPI_COMM_WORLD, &req);
+    int rc = MPI_Isend(send_vec->data() , FLAGS_num_int * sizeof(T), MPI_BYTE, to_rank, 0, MPI_COMM_WORLD, &req);
     CHECK_EQ(rc, MPI_SUCCESS);
   }
+
+
+  template<typename T> 
+  void asend(std::vector<T> *send_vec, int to_rank, size_t offset, size_t num)
+  {
+    int rc = MPI_Isend(send_vec->data() + offset , num * sizeof(T), MPI_BYTE, to_rank, 0, MPI_COMM_WORLD, &req);
+    CHECK_EQ(rc, MPI_SUCCESS);
+  }
+
 
   template<typename T>
   void send(std::vector<T> *send_vec, int to_rank)
@@ -48,9 +57,16 @@ class DistControl {
   }
 
   template<typename T>
-  void arecv(std::vector<T> *recv_vec, int from_rank, size_t size)
+  void arecv(std::vector<T> *recv_vec, int from_rank, size_t num)
   {
-    int rc = MPI_Irecv(recv_vec->data(), size * sizeof(T), MPI_BYTE, from_rank, 0, MPI_COMM_WORLD, &req);
+    int rc = MPI_Irecv(recv_vec->data(), num * sizeof(T), MPI_BYTE, from_rank, 0, MPI_COMM_WORLD, &req);
+    CHECK_EQ(rc, MPI_SUCCESS);
+  }
+
+  template<typename T>
+  void arecv(std::vector<T> *recv_vec, int from_rank, size_t offset, size_t num)
+  {
+    int rc = MPI_Irecv(recv_vec->data() + offset , num * sizeof(T), MPI_BYTE, from_rank, 0, MPI_COMM_WORLD, &req);
     CHECK_EQ(rc, MPI_SUCCESS);
   }
 
@@ -168,6 +184,73 @@ void init_vec(std::vector<T> *vec, size_t size) {
   }
 }
 
+
+template<typename T>
+void perf_async_off(DistControl *dc, std::vector<T> *vec, size_t off, size_t num) 
+{
+  long t1, t2, t3;
+  TIMER(t1);
+  if (dc->rank == 0) {
+    dc->asend<int>(vec, 1, off, num);
+  } else {
+    dc->arecv<int>(vec, 0, off, num);
+  }
+  TIMER(t2);
+
+  dc->wait();
+
+  TIMER(t3);
+
+  if (dc->rank == 0 )
+    LOG(INFO) << " asendoff time : " << t2 - t1;
+  else
+    LOG(INFO) << " arecvoff time : " << t2 - t1;
+
+  if (dc->rank == 0)
+    LOG(INFO) << " asendoff complete wait time : " << t3 - t2;
+  else
+    LOG(INFO) << " arecvoff complete wait time : " << t3 - t2;
+
+  if (dc->rank == 0)
+    LOG(INFO) << " asendoff whole wait time : " << t3 - t1;
+  else
+    LOG(INFO) << " arecvoff whole wait time : " << t3 - t1;
+
+
+  size_t GB = 1024 * 1024 * 1024;
+  size_t bytes = sizeof(int) * num;
+  double s1GB = (bytes * 1000) / double(GB) / (double)(t3 - t2) ;
+  double s2GB = (bytes * 1000) / double(GB) / (double)(t3 - t1) ;
+
+  if (dc->rank == 0) {
+    LOG(INFO) << " ASYNC GB/s sender : " << s1GB << "  " << s2GB << " size GB " << bytes / (double)GB;
+  } else {
+    LOG(INFO) << " ASYNC GB/s recver : " << s1GB << "  " << s2GB << " size GB " << bytes / (double)GB;
+  }
+}
+
+
+template<typename T>
+void do_perf_async_off(DistControl *dc, std::vector<T> *vec)
+{
+  
+  perf_async_off<int>(dc, vec, 0, FLAGS_num_int);
+  /* ROUND 1 */
+  if (dc->rank == 0) {
+    /* send */
+    perf_async_off<int>(dc, vec, 0, FLAGS_num_int / 2);
+  } else { 
+    /* recv */
+    size_t off = FLAGS_num_int / 2;
+    perf_async_off<int>(dc, vec, off, FLAGS_num_int/2);
+  }
+
+  /* ROUND 2 */
+
+}
+
+
+
 int main(int argc, char ** argv) 
 {
   google::ParseCommandLineFlags(&argc, &argv, false);
@@ -198,25 +281,45 @@ int main(int argc, char ** argv)
 
   /* perf async */
   /*
-  for(int i = 0;i < vec_arr_size;i ++) { 
-    if (rank == 0)  init_vec<int>(my_vec_array[i], FLAGS_num_int);
-    dc.barrier();
-    perf_async<int>(&dc, my_vec_array[i]);
+  for(int xx = 0; xx < 3; xx ++)  {
+    for(int i = 0;i < vec_arr_size;i ++) { 
+      if (rank == 0)  init_vec<int>(my_vec_array[i], FLAGS_num_int);
+      dc.barrier();
+      if (rank == 0) {
+        perf_async<int>(&dc, my_vec_array[i]);
+      } else { 
+        perf_async<int>(&dc, my_vec_array[0]);
+      }
+    }
   }
   */
 
+  /*
   for(int i = 0;i < vec_arr_size ;i ++) {
     if (rank == 0)  init_vec<int>(my_vec_array[i], FLAGS_num_int); // if you want to use the same buffer, change the index
     dc.barrier();
-    perf_sync<int>(&dc, my_vec_array[i]);
+    if (rank == 0) {
+      perf_sync<int>(&dc, my_vec_array[0]);
+    } else { 
+      perf_sync<int>(&dc, my_vec_array[i]);
+    }
   }
+  */
 
+  do_perf_async_off(&dc, my_vec_array[0]);
+
+
+
+
+
+  /*
   if (rank == 1) {
     // check value
     for(size_t i = 0;i < vec_arr_size;i ++) {
       check_vec<int>(my_vec_array[i], FLAGS_num_int);
     }
   }
+  */
 
 
   MPI_Finalize();
