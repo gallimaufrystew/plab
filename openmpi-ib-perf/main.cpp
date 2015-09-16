@@ -197,6 +197,10 @@ void perf_async_off(DistControl *dc, std::vector<T> *vec, size_t off, size_t num
   }
   TIMER(t2);
 
+  if (dc->rank == 1) {
+    sleep(1);
+  }
+  TIMER(t2);
   dc->wait();
 
   TIMER(t3);
