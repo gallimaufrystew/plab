@@ -173,8 +173,14 @@ void work() {
   size_t len = prep_data<T>(data_ptr, FLAGS_gb * 1024 * 1024 * 1024);
   LOG(INFO) << " prep data ok. len = " << len ;
 
-  register_event();
+  /* warm up */
   for (size_t i = 0;i < 5;i ++) { 
+    perf_data<T>(data_ptr, len, FLAGS_opt);
+  }
+ 
+  size_t tot_cnt = 5;
+  register_event();
+  for (size_t i = 0;i < tot_cnt;i ++) { 
     perf_data<T>(data_ptr, len, FLAGS_opt);
   }
   report_event();
