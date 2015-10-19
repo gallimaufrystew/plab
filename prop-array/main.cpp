@@ -95,6 +95,65 @@ struct B1Type {
 typedef struct B1Type B1Type;
 
 
+struct C3Type { 
+  double a;
+  double b[3];
+  static size_t valid_bytes() { 
+    return 8;
+  }
+  void init(double v) {
+    a = v;
+    for (size_t i = 0;i < 3;i ++)
+      b[i] = v;
+  }
+
+  void apply() { 
+    a += 1.0;
+  }
+};
+typedef struct C3Type C3Type;
+
+
+struct C7Type { 
+  double a;
+  double b[7];
+  static size_t valid_bytes() { 
+    return 8;
+  }
+  void init(double v) {
+    a = v;
+    for (size_t i = 0;i < 7;i ++)
+      b[i] = v;
+  }
+
+  void apply() { 
+    a += 1.0;
+  }
+};
+typedef struct C7Type C7Type;
+
+
+struct C15Type { 
+  double a;
+  double b[15];
+  static size_t valid_bytes() { 
+    return 8;
+  }
+  void init(double v) {
+    a = v;
+    for (size_t i = 0;i < 15;i ++)
+      b[i] = v;
+  }
+
+  void apply() { 
+    a += 1.0;
+  }
+};
+typedef struct C15Type C15Type;
+
+
+
+
 void register_event()
 { 
   int events[EVENT_COUNT] = {PAPI_L3_DCA, PAPI_L3_DCR, PAPI_L3_DCW, PAPI_TLB_DM};
@@ -197,8 +256,14 @@ int main(int argc, char ** argv) {
 
   LOG(INFO) << " sizeof AType " << sizeof(AType);
   LOG(INFO) << " sizeof BType " << sizeof(BType);
+  LOG(INFO) << " sizeof A1Type " << sizeof(A1Type);
+  LOG(INFO) << " sizeof B1Type " << sizeof(B1Type);
+  LOG(INFO) << " sizeof C3Type " << sizeof(C3Type);
+  LOG(INFO) << " sizeof C7Type " << sizeof(C7Type);
+  LOG(INFO) << " sizeof C15Type " << sizeof(C15Type);
 
 
+  LOG(INFO) << " opt = " << FLAGS_opt;
 
   if (FLAGS_opt == "a")  {
     work<AType>();
@@ -208,7 +273,16 @@ int main(int argc, char ** argv) {
     work<A1Type>();
   } else if (FLAGS_opt == "b1") { 
     work<B1Type>();
+  } else if (FLAGS_opt == "c3") { 
+    work<C3Type>();
+  } else if (FLAGS_opt == "c7") { 
+    work<C7Type>();
+  } else if (FLAGS_opt == "c15") { 
+    work<C15Type>();
   }
+
+
+
 
   return 0;
 }
