@@ -12,7 +12,6 @@
 #include <glog/logging.h>
 #include <errno.h>
 #include <stdint.h>
-#include "lock.hpp"
 
 
 #define EPOLL_WAIT_TIMEOUT (1000) // 1.0 second
